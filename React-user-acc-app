@@ -1,0 +1,73 @@
+import React, { useState, useEffect } from "react"; import "bootstrap/dist/css/bootstrap.min.css";
+
+// Single-file React app (App component) that implements: // - Registration page // - Login page // - Account page (view & edit profile) // Data persistence: browser localStorage (simple, no backend).
+
+export default function App() { // page: controls simple client-side routing const [page, setPage] = useState("login"); const [users, setUsers] = useState([]); // list of user objects {id, name, email, password} const [currentUserId, setCurrentUserId] = useState(null); const [alert, setAlert] = useState(null); // {type: 'success'|'danger'|'warning', msg: ''}
+
+// load users from localStorage on mount useEffect(() => { const raw = localStorage.getItem("rjs_users"); if (raw) setUsers(JSON.parse(raw)); const logged = localStorage.getItem("rjs_current_user"); if (logged) { setCurrentUserId(JSON.parse(logged)); setPage("account"); } }, []);
+
+// save users when changed useEffect(() => { localStorage.setItem("rjs_users", JSON.stringify(users)); }, [users]);
+
+// helpers function showAlert(type, msg, ms = 2500) { setAlert({ type, msg }); setTimeout(() => setAlert(null), ms); }
+
+function registerUser({ name, email, password }) { // simple validation if (!name || !email || !password) { showAlert("danger", "कृपया सभी फ़ील्ड भरें।"); return false; } const duplicate = users.find((u) => u.email.toLowerCase() === email.toLowerCase()); if (duplicate) { showAlert("danger", "यह ईमेल पहले से रजिस्टर है।"); return false; } const id = Date.now(); const newUser = { id, name, email: email.toLowerCase(), password }; setUsers((prev) => [...prev, newUser]); showAlert("success", "रजिस्ट्रेशन सफल! कृपया लॉगिन करें।"); setPage("login"); return true; }
+
+function loginUser({ email, password }) { if (!email || !password) { showAlert("danger", "ईमेल और पासवर्ड दोनों चाहिए।"); return false; } const user = users.find((u) => u.email === email.toLowerCase()); if (!user || user.password !== password) { showAlert("danger", "ईमेल या पासवर्ड गलत है।"); return false; } setCurrentUserId(user.id); localStorage.setItem("rjs_current_user", JSON.stringify(user.id)); setPage("account"); showAlert("success", स्वागत है, ${user.name}); return true; }
+
+function logout() { setCurrentUserId(null); localStorage.removeItem("rjs_current_user"); setPage("login"); showAlert("success", "आप लॉगआउट हो गए।"); }
+
+function updateProfile(id, { name, email, password }) { // basic checks for duplicate email const emailLower = email.toLowerCase(); const duplicate = users.find((u) => u.email === emailLower && u.id !== id); if (duplicate) { showAlert("danger", "यह ईमेल किसी अन्य उपयोगकर्ता के साथ जुड़ा हुआ है।"); return false; } setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, name, email: emailLower, password: password || u.password } : u)) ); showAlert("success", "प्रोफ़ाइल अपडेट हो गई।"); return true; }
+
+const currentUser = users.find((u) => u.id === currentUserId) || null;
+
+return ( <div className="container py-4"> <Header loggedIn={!!currentUser} onNav={(p) => setPage(p)} onLogout={logout} />
+
+{alert && (
+    <div className={`alert alert-${alert.type} mt-3`} role="alert">
+      {alert.msg}
+    </div>
+  )}
+
+  <div className="card mt-3 shadow-sm">
+    <div className="card-body">
+      {page === "login" && <LoginForm onLogin={loginUser} onSwitch={() => setPage("register")} />}
+      {page === "register" && <RegisterForm onRegister={registerUser} onSwitch={() => setPage("login")} />}
+      {page === "account" && currentUser && (
+        <AccountPage user={currentUser} onUpdate={updateProfile} onLogout={logout} />
+      )}
+
+      {page === "account" && !currentUser && (
+        <div className="text-center py-4">
+          <p>कोई उपयोगकर्ता लॉग इन नहीं है।</p>
+          <button className="btn btn-primary" onClick={() => setPage("login")}>लॉगिन पेज</button>
+        </div>
+      )}
+    </div>
+  </div>
+
+  <footer className="text-center mt-4 text-muted small">Simple React (Bootstrap) user accounts example — data stored in localStorage</footer>
+</div>
+
+); }
+
+// Header / Navigation function Header({ loggedIn, onNav, onLogout }) { return ( <nav className="d-flex justify-content-between align-items-center"> <h3 className="m-0">User Accounts App</h3> <div> {!loggedIn ? ( <> <button className="btn btn-outline-primary me-2" onClick={() => onNav("login")}>Login</button> <button className="btn btn-primary" onClick={() => onNav("register")}>Register</button> </> ) : ( <> <button className="btn btn-outline-secondary me-2" onClick={() => onNav("account")}>My Account</button> <button className="btn btn-danger" onClick={onLogout}>Logout</button> </> )} </div> </nav> ); }
+
+// Login form component function LoginForm({ onLogin, onSwitch }) { const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
+
+function submit(e) { e.preventDefault(); onLogin({ email, password }); }
+
+return ( <form onSubmit={submit}> <h5>Login</h5> <div className="mb-3"> <label className="form-label">Email</label> <input className="form-control" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /> </div> <div className="mb-3"> <label className="form-label">Password</label> <input className="form-control" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /> </div> <div className="d-flex gap-2"> <button className="btn btn-primary" type="submit">Login</button> <button className="btn btn-link" type="button" onClick={onSwitch}>Create an account</button> </div> </form> ); }
+
+// Registration form component function RegisterForm({ onRegister, onSwitch }) { const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState("");
+
+function submit(e) { e.preventDefault(); if (password !== confirm) { alert("पासवर्ड मैच नहीं कर रहा।"); return; } onRegister({ name, email, password }); }
+
+return ( <form onSubmit={submit}> <h5>Create account</h5> <div className="mb-3"> <label className="form-label">Full name</label> <input className="form-control" value={name} onChange={(e) => setName(e.target.value)} /> </div> <div className="mb-3"> <label className="form-label">Email</label> <input className="form-control" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /> </div> <div className="mb-3"> <label className="form-label">Password</label> <input className="form-control" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /> </div> <div className="mb-3"> <label className="form-label">Confirm password</label> <input className="form-control" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /> </div> <div className="d-flex gap-2"> <button className="btn btn-success" type="submit">Register</button> <button className="btn btn-link" type="button" onClick={onSwitch}>Back to login</button> </div> </form> ); }
+
+// Account page (view & edit) function AccountPage({ user, onUpdate, onLogout }) { const [editing, setEditing] = useState(false); const [name, setName] = useState(user.name); const [email, setEmail] = useState(user.email); const [password, setPassword] = useState(""); // empty -> keep old
+
+useEffect(() => { // when user prop changes (rare), refresh local fields setName(user.name); setEmail(user.email); setPassword(""); }, [user]);
+
+function submit(e) { e.preventDefault(); const success = onUpdate(user.id, { name: name.trim(), email: email.trim(), password: password.trim() }); if (success) setEditing(false); }
+
+return ( <div> <h5>My Account</h5> {!editing ? ( <div> <p><strong>Name:</strong> {user.name}</p> <p><strong>Email:</strong> {user.email}</p> <div className="d-flex gap-2"> <button className="btn btn-primary" onClick={() => setEditing(true)}>Edit profile</button> <button className="btn btn-secondary" onClick={onLogout}>Logout</button> </div> </div> ) : ( <form onSubmit={submit}> <div className="mb-3"> <label className="form-label">Full name</label> <input className="form-control" value={name} onChange={(e) => setName(e.target.value)} /> </div> <div className="mb-3"> <label className="form-label">Email</label> <input className="form-control" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /> </div> <div className="mb-3"> <label className="form-label">New password (leave blank to keep current)</label> <input className="form-control" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /> </div> <div className="d-flex gap-2"> <button className="btn btn-success" type="submit">Save</button> <button className="btn btn-link" type="button" onClick={() => setEditing(false)}>Cancel</button> </div> </form> )} </div> ); }
